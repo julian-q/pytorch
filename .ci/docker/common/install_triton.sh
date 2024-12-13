@@ -51,6 +51,34 @@ as_jenkins git clone --recursive ${TRITON_REPO} triton
 cd triton
 as_jenkins git checkout ${TRITON_PINNED_COMMIT}
 as_jenkins git submodule update --init --recursive
+echo "##$$## Patching..."
+touch ./triton_flt16_max.patch
+cat > ./triton_flt16_max.patch << EOF
+diff --git a/third_party/cpu/runtime/cpu_runtime.cpp b/third_party/cpu/runtime/cpu_runtime.cpp
+index 68b7efa7..193d8772 100644
+--- a/third_party/cpu/runtime/cpu_runtime.cpp
++++ b/third_party/cpu/runtime/cpu_runtime.cpp
+@@ -28,14 +28,14 @@ const int FLOAT_PREC = 4;
+ const int ELEMS_PER_LINE = 8;
+ 
+ using FLOAT16 = struct _FLOAT16 {
+-#ifdef FLT16_MAX
++#ifdef FLT16_MAX_BOGUS
+   _Float16 x;
+ #else
+   uint16_t x;
+ #endif
+ 
+   float toFloat32() const {
+-#ifdef FLT16_MAX
++#ifdef FLT16_MAX_BOGUS
+     return static_cast<float>(x);
+ #else
+     // Based on https://gist.github.com/zhuker/b4bd1fb306c7b04975b712c37c4c4075
+EOF
+
+patch -p1 < ./triton_flt16_max.patch
+git status
 cd python
 
 # TODO: remove patch setup.py once we have a proper fix for https://github.com/triton-lang/triton/issues/4527
