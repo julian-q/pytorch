@@ -214,8 +214,8 @@ jobs:
 
 
 
-  linux-jammy-py3_9-gcc11-build-2xlarge.memory:
-    name: linux-jammy-py3.9-gcc11-2xlarge.memory
+  linux-jammy-py3_9-gcc11-build-2xlarge-memory:
+    name: linux-jammy-py3.9-gcc11-2xlarge-memory
     uses: ./.github/workflows/_linux-build.yml
     needs: get-label-type
     with:
@@ -239,8 +239,8 @@ jobs:
         ]}
     secrets: inherit
 
-  linux-jammy-py3_10-clang15-asan-build-2xlarge.memory:
-    name: linux-jammy-py3.10-clang15-asan-2xlarge.memory
+  linux-jammy-py3_10-clang15-asan-build-2xlarge-memory:
+    name: linux-jammy-py3.10-clang15-asan-2xlarge-memory
     uses: ./.github/workflows/_linux-build.yml
     needs: get-label-type
     with:
@@ -260,8 +260,8 @@ jobs:
       sync-tag: asan-build
     secrets: inherit
 
-  linux-focal-py3_9-clang10-build-2xlarge.memory:
-    name: linux-focal-py3.9-clang10-2xlarge.memory
+  linux-focal-py3_9-clang10-build-2xlarge-memory:
+    name: linux-focal-py3.9-clang10-2xlarge-memory
     uses: ./.github/workflows/_linux-build.yml
     needs: get-label-type
     with:
@@ -284,8 +284,8 @@ jobs:
         ]}
     secrets: inherit
 
-  linux-focal-py3_13-clang10-build-2xlarge.memory:
-    name: linux-focal-py3.13-clang10-2xlarge.memory
+  linux-focal-py3_13-clang10-build-2xlarge-memory:
+    name: linux-focal-py3.13-clang10-2xlarge-memory
     uses: ./.github/workflows/_linux-build.yml
     needs: get-label-type
     with:
@@ -308,8 +308,8 @@ jobs:
         ]}
     secrets: inherit
 
-  linux-focal-cuda11_8-py3_10-gcc9-build-2xlarge.memory:
-    name: linux-focal-cuda11.8-py3.10-gcc9-2xlarge.memory
+  linux-focal-cuda11_8-py3_10-gcc9-build-2xlarge-memory:
+    name: linux-focal-cuda11.8-py3.10-gcc9-2xlarge-memory
     uses: ./.github/workflows/_linux-build.yml
     needs: get-label-type
     with:
@@ -326,8 +326,8 @@ jobs:
         ]}
     secrets: inherit
 
-  linux-focal-cuda12_4-py3_10-gcc9-build-2xlarge.memory:
-    name: linux-focal-cuda12.4-py3.10-gcc9-2xlarge.memory
+  linux-focal-cuda12_4-py3_10-gcc9-build-2xlarge-memory:
+    name: linux-focal-cuda12.4-py3.10-gcc9-2xlarge-memory
     uses: ./.github/workflows/_linux-build.yml
     needs: get-label-type
     with:
@@ -345,8 +345,8 @@ jobs:
         ]}
     secrets: inherit
 
-  linux-jammy-cuda-11_8-cudnn9-py3_9-clang12-build-2xlarge.memory:
-    name: linux-jammy-cuda11.8-cudnn9-py3.9-clang12-2xlarge.memory
+  linux-jammy-cuda-11_8-cudnn9-py3_9-clang12-build-2xlarge-memory:
+    name: linux-jammy-cuda11.8-cudnn9-py3.9-clang12-2xlarge-memory
     uses: ./.github/workflows/_linux-build.yml
     needs: get-label-type
     with:
@@ -360,8 +360,8 @@ jobs:
         ]}
     secrets: inherit
 
-  linux-focal-cuda12_4-py3_10-gcc9-sm89-build-2xlarge.memory:
-    name: linux-focal-cuda12.4-py3.10-gcc9-sm89-2xlarge.memory
+  linux-focal-cuda12_4-py3_10-gcc9-sm89-build-2xlarge-memory:
+    name: linux-focal-cuda12.4-py3.10-gcc9-sm89-2xlarge-memory
     uses: ./.github/workflows/_linux-build.yml
     needs: get-label-type
     with:
