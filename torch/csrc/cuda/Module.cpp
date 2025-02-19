@@ -593,10 +593,10 @@ PyObject* THCPModule_memoryStats(PyObject* _unused, PyObject* arg) {
   TORCH_CHECK(THPUtils_checkLong(arg), "invalid argument to memory_allocated");
   const auto device_index = THPUtils_unpackDeviceIndex(arg);
 
+  using c10::Stat;
+  using c10::StatArray;
+  using c10::StatType;
   using c10::CachingDeviceAllocator::DeviceStats;
-  using c10::CachingDeviceAllocator::Stat;
-  using c10::CachingDeviceAllocator::StatArray;
-  using c10::CachingDeviceAllocator::StatType;
 
   const auto statToDict = [](const Stat& stat) {
     py::dict dict;
@@ -666,6 +666,60 @@ PyObject* THCPModule_resetPeakMemoryStats(PyObject* _unused, PyObject* arg) {
   END_HANDLE_TH_ERRORS
   Py_RETURN_NONE;
 }
+
+PyObject* THCPModule_hostMemoryStats(PyObject* _unused, PyObject* noargs) {
+  HANDLE_TH_ERRORS
+
+  using at::HostStats;
+  using c10::Stat;
+  using c10::StatArray;
+  using c10::StatType;
+
+  const auto statToDict = [](const Stat& stat) {
+    py::dict dict;
+
+    dict["current"] = stat.current;
+    dict["peak"] = stat.peak;
+    dict["allocated"] = stat.allocated;
+    dict["freed"] = stat.freed;
+    return dict;
+  };
+
+  const HostStats stats = at::cuda::CachingHostAllocator_getStats();
+
+  py::dict result;
+  result["num_host_alloc"] = stats.num_host_alloc;
+  result["num_host_free"] = stats.num_host_free;
+  result["allocation"] = statToDict(stats.allocation);
+  result["segment"] = statToDict(stats.segment);
+  //result["active"] = statArrayToDict(stats.active);
+  //result["inactive_split"] = statArrayToDict(stats.inactive_split);
+  result["allocated_bytes"] = statToDict(stats.allocated_bytes);
+  //result["reserved_bytes"] = statArrayToDict(stats.reserved_bytes);
+  result["active_bytes"] = statToDict(stats.active_bytes);
+  //result["inactive_split_bytes"] = statArrayToDict(stats.inactive_split_bytes);
+  result["requested_bytes"] = statToDict(stats.requested_bytes);
+
+  return result.release().ptr();
+  END_HANDLE_TH_ERRORS
+}
+
+PyObject* THCPModule_resetAccumulatedHostMemoryStats(
+    PyObject* _unused,
+    PyObject* noargs) {
+  HANDLE_TH_ERRORS
+  at::cuda::CachingHostAllocator_resetAccumulatedStats();
+  END_HANDLE_TH_ERRORS
+  Py_RETURN_NONE;
+}
+
+PyObject* THCPModule_resetPeakHostMemoryStats(PyObject* _unused, PyObject* noargs) {
+  HANDLE_TH_ERRORS
+  at::cuda::CachingHostAllocator_resetPeakStats();
+  END_HANDLE_TH_ERRORS
+  Py_RETURN_NONE;
+}
+
 
 CapturedTraceback* getFromContext(
     const std::shared_ptr<c10::GatheredContext>& x) {
@@ -1957,6 +2011,9 @@ static struct PyMethodDef _THCPModule_methods[] = {
      THCPModule_attachOutOfMemoryObserver,
      METH_O,
      nullptr},
+    {"_cuda_hostMemoryStats", THCPModule_hostMemoryStats, METH_NOARGS, nullptr},
+    {"_cuda_resetAccumulatedHostMemoryStats", THCPModule_resetAccumulatedHostMemoryStats, METH_NOARGS, nullptr},
+    {"_cuda_resetPeakHostMemoryStats", THCPModule_resetPeakHostMemoryStats, METH_NOARGS, nullptr},
     {"_cuda_cudaHostAllocator",
      THCPModule_cudaHostAllocator,
      METH_NOARGS,

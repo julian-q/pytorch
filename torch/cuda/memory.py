@@ -39,6 +39,9 @@ __all__ = [
     "reset_peak_memory_stats",
     "reset_max_memory_allocated",
     "reset_max_memory_cached",
+    "host_memory_stats",
+    "reset_accumulated_host_memory_stats",
+    "reset_peak_host_memory_stats",
     "memory_allocated",
     "max_memory_allocated",
     "memory_reserved",
@@ -330,7 +333,6 @@ def memory_stats_as_nested_dict(device: Union[Device, int] = None) -> dict[str, 
     device = _get_device_index(device, optional=True)
     return torch._C._cuda_memoryStats(device)
 
-
 def reset_accumulated_memory_stats(device: Union[Device, int] = None) -> None:
     r"""Reset the "accumulated" (historical) stats tracked by the CUDA memory allocator.
 
@@ -369,6 +371,81 @@ def reset_peak_memory_stats(device: Union[Device, int] = None) -> None:
     device = _get_device_index(device, optional=True)
     return torch._C._cuda_resetPeakMemoryStats(device)
 
+
+def host_memory_stats() -> dict[str, Any]:
+    r"""Return a dictionary of CUDA memory allocator statistics for a given device.
+
+    The return value of this function is a dictionary of statistics, each of
+    which is a non-negative integer.
+
+    Core statistics:
+
+    - ``"allocated.{all,large_pool,small_pool}.{current,peak,allocated,freed}"``:
+      number of allocation requests received by the memory allocator.
+    - ``"allocated_bytes.{all,large_pool,small_pool}.{current,peak,allocated,freed}"``:
+      amount of allocated memory.
+    - ``"segment.{all,large_pool,small_pool}.{current,peak,allocated,freed}"``:
+      number of reserved segments from ``cudaMalloc()``.
+    - ``"reserved_bytes.{all,large_pool,small_pool}.{current,peak,allocated,freed}"``:
+      amount of reserved memory.
+    - ``"active.{all,large_pool,small_pool}.{current,peak,allocated,freed}"``:
+      number of active memory blocks.
+    - ``"active_bytes.{all,large_pool,small_pool}.{current,peak,allocated,freed}"``:
+      amount of active memory.
+    - ``"inactive_split.{all,large_pool,small_pool}.{current,peak,allocated,freed}"``:
+      number of inactive, non-releasable memory blocks.
+    - ``"inactive_split_bytes.{all,large_pool,small_pool}.{current,peak,allocated,freed}"``:
+      amount of inactive, non-releasable memory.
+
+    For these core statistics, values are broken down as follows.
+
+    Metric type:
+
+    - ``current``: current value of this metric.
+    - ``peak``: maximum value of this metric.
+    - ``allocated``: historical total increase in this metric.
+    - ``freed``: historical total decrease in this metric.
+    """
+    result = []
+
+    def _recurse_add_to_result(prefix, obj):
+        if isinstance(obj, dict):
+            if len(prefix) > 0:
+                prefix += "."
+            for k, v in obj.items():
+                _recurse_add_to_result(prefix + k, v)
+        else:
+            result.append((prefix, obj))
+
+    stats = host_memory_stats_as_nested_dict()
+    _recurse_add_to_result("", stats)
+    result.sort()
+
+    return collections.OrderedDict(result)
+
+def host_memory_stats_as_nested_dictionary() -> dict[str, Any]:
+    r"""Return the result of :func:`~torch.cuda.host_memory_stats` as a nested dictionary."""
+    if not is_initialized():
+        return {}
+    return torch._C._cuda_hostMemoryStats()
+
+def reset_accumulated_host_memory_stats() -> None:
+    r"""Reset the "accumulated" (historical) stats tracked by the host memory allocator.
+
+    See :func:`~torch.cuda.host_memory_stats` for details. Accumulated stats correspond to
+    the `"allocated"` and `"freed"` keys in each individual stat dict.
+    """
+    return torch._C._cuda_resetAccumulatedHostMemoryStats()
+
+
+def reset_peak_host_memory_stats() -> None:
+    r"""Reset the "peak" stats tracked by the host memory allocator.
+
+    See :func:`~torch.cuda.host_memory_stats` for details. Peak stats correspond to the
+    `"peak"` key in each individual stat dict.
+    """
+    device = _get_device_index(device, optional=True)
+    return torch._C._cuda_resetPeakHostMemoryStats()
 
 def reset_max_memory_allocated(device: Union[Device, int] = None) -> None:
     r"""Reset the starting point in tracking maximum GPU memory occupied by tensors for a given device.
