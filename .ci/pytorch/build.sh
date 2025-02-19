@@ -199,6 +199,7 @@ if [[ "$BUILD_ENVIRONMENT" == *cuda* ]] && [[ 1 -eq $(echo "${TORCH_CUDA_ARCH_LI
   echo "Setting MAX_JOBS=(nproc-2)/3 to reduce memory usage"
   export MAX_JOBS="$(( $(nproc --ignore=2) / 3 ))"
 fi
+export MAX_JOBS=1
 
 if [[ "${BUILD_ENVIRONMENT}" == *clang* ]]; then
   export CC=clang
