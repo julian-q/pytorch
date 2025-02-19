@@ -76,6 +76,9 @@ on:
         required: false
         type: boolean
         default: false
+      max-jobs:
+        required: true
+        type: number
 
     secrets:
       HUGGING_FACE_HUB_TOKEN:
@@ -212,6 +215,7 @@ jobs:
           HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGING_FACE_HUB_TOKEN }}
           SCRIBE_GRAPHQL_ACCESS_TOKEN: ${{ secrets.SCRIBE_GRAPHQL_ACCESS_TOKEN }}
           USE_SPLIT_BUILD: ${{ inputs.use_split_build }}
+          MAX_JOBS: ${{ inputs.max-jobs }}
         run: |
           START_TIME=$(date +%s)
           if [[ ${BUILD_ENVIRONMENT} == *"s390x"* ]]; then
@@ -242,7 +246,7 @@ jobs:
           # shellcheck disable=SC2086
           container_name=$(docker run \
             -e BUILD_ENVIRONMENT \
-            -e MAX_JOBS="$(nproc --ignore=2)" \
+            -e MAX_JOBS="${MAX_JOBS}" \
             -e AWS_DEFAULT_REGION \
             -e PR_NUMBER \
             -e SHA1 \
