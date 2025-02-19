@@ -117,8 +117,6 @@ jobs:
       sync-tag: asan-build
     secrets: inherit
 
-
-
   linux-focal-py3_9-clang10-onnx-build:
     name: linux-focal-py3.9-clang10-onnx
     uses: ./.github/workflows/_linux-build.yml

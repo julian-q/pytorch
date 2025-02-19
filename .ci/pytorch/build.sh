@@ -196,10 +196,10 @@ fi
 # memory to build and will OOM
 if [[ "$BUILD_ENVIRONMENT" == *cuda* ]] && [[ 1 -eq $(echo "${TORCH_CUDA_ARCH_LIST} >= 8.0" | bc) ]]; then
   echo "WARNING: FlashAttention files require large amounts of memory to build and will OOM"
-  echo "Setting MAX_JOBS=(nproc-2)/3 to reduce memory usage"
-  export MAX_JOBS="$(( $(nproc --ignore=2) / 3 ))"
+  echo "Setting MAX_JOBS=nproc to reduce memory usage"
+  export MAX_JOBS=$(nproc)
 fi
-export MAX_JOBS=1
+export MAX_JOBS=$(nproc)
 
 if [[ "${BUILD_ENVIRONMENT}" == *clang* ]]; then
   export CC=clang
