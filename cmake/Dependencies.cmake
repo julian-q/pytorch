@@ -99,6 +99,8 @@ if(USE_XPU)
   foreach(flag ${XPU_HOST_CXX_FLAGS})
     add_definitions(${flag})
   endforeach()
+else()
+  caffe2_update_option(USE_XCCL OFF)
 endif()
 
 # ---[ Custom Protobuf
