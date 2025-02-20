@@ -37,7 +37,7 @@ class TestXpuConfig(TestCase):
 
     def test_xccl_record(self):
         config = torch.__config__.show()
-        assert 'USE_XCCL=0' in config or 'USE_XCCL=1' in config
+        assert f'USE_XCCL={int(torch.distributed.is_xccl_available())}' in config
 
 if not TEST_XPU:
     print("XPU not available, skipping tests", file=sys.stderr)
