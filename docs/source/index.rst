@@ -56,6 +56,7 @@ Features described in this documentation are classified by release status:
    :caption: Python API
 
    torch
+   dynamo_tracing
    nn
    nn.functional
    tensors

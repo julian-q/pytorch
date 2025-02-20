@@ -63,7 +63,8 @@ extensions = [
     "sphinx.ext.autosectionlabel",
     "sphinx_copybutton",
     "sphinx_panels",
-    "myst_parser",
+    # "myst_parser",
+    "myst_nb",
     "sphinx.ext.linkcode",
 ]
 
