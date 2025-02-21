@@ -1665,7 +1665,7 @@ class GraphModuleDeserializer(metaclass=Final):
                         isinstance(sym, sympy.Symbol)
                         and symbolic_shapes.symbol_is_type(sym, (SymT.UNBACKED_INT, SymT.UNBACKED_FLOAT))
                     ):
-                        self.unbacked_symbols.append(sym)
+                        self.unbacked_symbols.add(sym)
                 # hints
                 if (
                     hint is not None
@@ -2134,7 +2134,7 @@ class GraphModuleDeserializer(metaclass=Final):
             self.symbol_name_to_range = {}
             # we also need to bump unbacked sym[float,int] counters in the
             # shape env to accommodate unbacked symbols in the exported program
-            self.unbacked_symbols = []
+            self.unbacked_symbols = set()
             count_unbacked_symfloat, count_unbacked_symint = -1, -1
             unbacked_symfloat_prefix, unbacked_symint_prefix = (
                 prefix_str[t] for t in [SymT.UNBACKED_FLOAT, SymT.UNBACKED_INT]
