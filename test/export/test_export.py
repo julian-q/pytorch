@@ -3824,8 +3824,8 @@ def forward(self, p_linear_weight, p_linear_bias, b_buffer, x):
         export(N(), inputs, dynamic_shapes=dynamic_shapes)
 
     def test_unbacked_bindings_for_divisible_u_symint(self):
-        from torch.utils._sympy.symbol import prefix_str, symbol_is_type, SymT
         from torch._guards import detect_fake_mode
+        from torch.utils._sympy.symbol import prefix_str, symbol_is_type, SymT
 
         class M(torch.nn.Module):
             def forward(self, a, b):
@@ -3864,14 +3864,15 @@ def forward(self, p_linear_weight, p_linear_bias, b_buffer, x):
             bound.update(node.meta.get("unbacked_bindings", {}))
 
         # check ShapeEnv counters compared to binding indices
-        shape_env = detect_fake_mode([
-            node.meta.get("val")
-            for node in ep.graph.nodes
-        ]).shape_env
+        shape_env = detect_fake_mode(
+            [node.meta.get("val") for node in ep.graph.nodes]
+        ).shape_env
         next_index = next(shape_env.unbacked_symint_counter)
         for symbol in bound:
             self.assertTrue(symbol_is_type(symbol, SymT.UNBACKED_INT))
-            self.assertTrue(int(str(symbol)[len(prefix_str[SymT.UNBACKED_INT]):]) < next_index)
+            self.assertTrue(
+                int(str(symbol)[len(prefix_str[SymT.UNBACKED_INT]):]) < next_index
+            )
 
     def test_torch_check_eq_commutativity(self):
         class M1(torch.nn.Module):
@@ -3907,6 +3908,38 @@ def forward(self, p_linear_weight, p_linear_bias, b_buffer, x):
             M2(),
             (torch.tensor(6), torch.tensor(6), torch.tensor(6), torch.randn(1)),
         )
+
+    def test_replaced_unbacked_bindings(self):
+        import sympy
+        from torch.utils._sympy.symbol import prefix_str, symbol_is_type, SymT
+
+        class Foo(torch.nn.Module):
+            def forward(self, x, y, z):
+                m, n = x.item(), y.item()
+                torch._check(m == 4)
+                torch._check(n == z.shape[0])
+                return m + n + z
+
+        inps = (
+            torch.tensor(4),
+            torch.tensor(5),
+            torch.randn(5),
+        )
+        dynamic_shapes = {
+            "x": None,
+            "y": None,
+            "z": (Dim("dx", max=16),),
+        }
+        ep = export(Foo(), inps, dynamic_shapes=dynamic_shapes)
+        # values should have no unbacked symbols, bindings should be empty
+        for node in ep.graph.nodes:
+            symbols = []
+            val = node.meta.get("val")
+            bindings = node.meta.get("unbacked_bindings")
+            self.assertTrue(
+                not (isinstance(val, sympy.Symbol) and symbol_is_type(val, SymT.UNBACKED_INT))
+            )
+            self.assertTrue(bindings is None)
 
     def test_raise_user_error_when_guard_on_data_dependent_operation(self):
         class M(torch.nn.Module):
@@ -9782,7 +9815,6 @@ def forward(self, p_bar_linear_weight, p_bar_linear_bias, x):
             "torch.ops.profiler._record_function_enter_new.default", 0, exactly=True
         ).run(ep.graph_module.code)
 
-    @testing.expectedFailureSerDerNonStrict
     def test_replace_unbacked_with_very_large_upperbound(self):
         # beyond 2^53 where python floats lose precision
         VERY_LARGE_INT = 1000000007999999992

@@ -434,32 +434,29 @@ def _remap_constants(
                 constants[target] = constant
 
 
-def _replace_unbacked_bindings(
-    gm: torch.fx.GraphModule
-) -> None:
-    from torch.fx.experimental.symbolic_shapes import (
-        free_unbacked_symbols_with_path,
-    )
+def _replace_unbacked_bindings(gm: torch.fx.GraphModule) -> None:
+    from torch.fx.experimental.symbolic_shapes import _free_unbacked_symbols_with_path
     from torch.utils._sympy.symbol import symbol_is_type, SymT
 
     fake_mode = detect_fake_mode([node.meta.get("val") for node in gm.graph.nodes])
     if fake_mode is None or (shape_env := fake_mode.shape_env) is None:
         return
 
-    base_unbacked_symbols = set(
+    base_unbacked_symbols = {
         symbol
         for symbol in shape_env.var_to_range
         if symbol_is_type(symbol, (SymT.UNBACKED_INT, SymT.UNBACKED_FLOAT))
         and symbol not in shape_env.unbacked_renamings
-    )
+    }
     for node in gm.graph.nodes:
         node.meta.pop("unbacked_bindings", None)
-        if (
-            (val := node.meta.get("val")) is not None
-            and (
-                unbacked_bindings := free_unbacked_symbols_with_path(
-                    val, (), shape_env=shape_env, pending=base_unbacked_symbols, simplify=True
-                )
+        if (val := node.meta.get("val")) is not None and (
+            unbacked_bindings := _free_unbacked_symbols_with_path(
+                val,
+                (),
+                shape_env=shape_env,
+                pending=base_unbacked_symbols,
+                simplify=True,
             )
         ):
             node.meta["unbacked_bindings"] = unbacked_bindings
@@ -493,6 +490,7 @@ def _produce_aten_artifact(
     # Overwrite output specs afterwards.
     flat_fake_args = pytree.tree_leaves((fake_args, fake_kwargs))
     gm, graph_signature = apply_runtime_assertion_pass(gm, graph_signature)
+    _replace_unbacked_bindings(gm)
 
     total_non_user_inputs = (
         len(graph_signature.parameters)
@@ -822,12 +820,6 @@ def _export_to_aten_ir(
     # is not working well with aot_export. So we manually copy it.
     # (The node-level meta is addressed above.)
     _maybe_fixup_gm_and_output_node_meta(mod, gm)
-
-    if (
-        (fake_mode := detect_fake_mode(fake_args + tuple(fake_kwargs) + tuple(fake_params_buffers)))
-        and (shape_env := fake_mode.shape_env)
-    ):
-        _replace_unbacked_bindings(gm)
 
     # Run produce guards before we handle runtime asserts.
     # This means we run the export solver before the runtime asserts pass.
@@ -1691,8 +1683,6 @@ def _export_to_aten_ir_make_fx(
             trace_joint=False,
             kwargs=fake_kwargs,
         )
-
-        _replace_unbacked_bindings(gm)
 
         # [NOTE] In training IR, we don't run
         # any DCE as a result we preserve constant

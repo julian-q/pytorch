@@ -940,7 +940,7 @@ class DivideByKey:
         return o // self.divisor
 
 
-def free_unbacked_symbols_with_path(
+def _free_unbacked_symbols_with_path(
     a: object,
     path: pytree.KeyPath,
     real: Optional[object] = None,
@@ -949,11 +949,12 @@ def free_unbacked_symbols_with_path(
     simplify: bool = False,
 ) -> dict[sympy.Symbol, pytree.KeyPath]:
     go = functools.partial(
-        free_unbacked_symbols_with_path,
+        _free_unbacked_symbols_with_path,
         shape_env=shape_env,
         pending=pending,
         simplify=simplify,
     )
+
     def expr(s: Union[SymInt, SymFloat, SymBool]) -> sympy.Expr:
         if simplify:
             return s.node.expr
@@ -979,9 +980,7 @@ def free_unbacked_symbols_with_path(
         attrs, _ = a.__tensor_flatten__()
         for attr in attrs:
             sub = getattr(a, attr)
-            r.update(
-                go(sub, path + (InnerTensorKey(attr),))
-            )
+            r.update(go(sub, path + (InnerTensorKey(attr),)))
     elif isinstance(a, torch.Tensor):
         from torch._subclasses.fake_tensor import FakeTensor
 
@@ -1044,15 +1043,17 @@ def free_unbacked_symbols_with_path(
     ):
 
         def _symint_wrap(s: sympy.Symbol) -> SymInt:
-            return shape_env.create_symintnode(
+            return shape_env.create_symintnode(  # type: ignore[union-attr]
                 s,
-                hint=int(shape_env.var_to_val[s]),
-                source=shape_env.var_to_sources.get(s, [None])[0],
+                hint=int(shape_env.var_to_val[s]),  # type: ignore[union-attr]
+                source=shape_env.var_to_sources.get(s, [None])[0],  # type: ignore[union-attr]
             )
 
         unbacked = lhs if lhs in pending else rhs
         divisor: Union[int, SymInt] = (
-            int(coeff) if shape_env and isinstance(coeff, sympy.Integer) else _symint_wrap(coeff)
+            int(coeff)
+            if shape_env and isinstance(coeff, sympy.Integer)
+            else _symint_wrap(coeff)
         )
         # TODO: DivideByKey needs to test divisibility at runtime!
         r[unbacked] = path + (DivideByKey(divisor),)
@@ -1118,7 +1119,9 @@ def compute_unbacked_bindings(
         log.info("compute_unbacked_bindings %s", fs)
         fs.clear()
 
-    symbol_to_path = free_unbacked_symbols_with_path(example_value, (), shape_env=shape_env, pending=pending, simplify=False)
+    symbol_to_path = _free_unbacked_symbols_with_path(
+        example_value, (), shape_env=shape_env, pending=pending, simplify=False
+    )
     if not peek and pending:
         extra = (
             repr((example_value.stride(), example_value.storage_offset()))

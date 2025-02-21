@@ -1883,7 +1883,7 @@ class GraphModuleDeserializer(metaclass=Final):
             if (
                 (val := node.meta.get("val")) is not None
                 and (
-                    unbacked_bindings := symbolic_shapes.free_unbacked_symbols_with_path(
+                    unbacked_bindings := symbolic_shapes._free_unbacked_symbols_with_path(
                         val, (), shape_env=self.shape_env, pending=self.unbacked_symbols, simplify=True
                     )
                 )
@@ -2134,7 +2134,7 @@ class GraphModuleDeserializer(metaclass=Final):
             self.symbol_name_to_range = {}
             # we also need to bump unbacked sym[float,int] counters in the
             # shape env to accommodate unbacked symbols in the exported program
-            self.unbacked_symbols = set()
+            self.unbacked_symbols: set[sympy.Symbol] = set()
             count_unbacked_symfloat, count_unbacked_symint = -1, -1
             unbacked_symfloat_prefix, unbacked_symint_prefix = (
                 prefix_str[t] for t in [SymT.UNBACKED_FLOAT, SymT.UNBACKED_INT]
