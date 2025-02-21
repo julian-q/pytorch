@@ -4,12 +4,23 @@ from contextlib import contextmanager
 import torch
 import torch._custom_ops
 from torch._C import DispatchKey
+from torch._higher_order_ops.flat_apply import (
+    ConstantFunction,
+    flat_apply,
+    to_graphable,
+)
 from torch._higher_order_ops.strict_mode import strict_mode
 from torch._higher_order_ops.utils import autograd_not_implemented
 from torch._ops import HigherOrderOperator
 from torch._subclasses.fake_tensor import FakeTensorMode
-from torch.fx.experimental.proxy_tensor import ProxyTorchDispatchMode, track_tensor_tree
+from torch.fx.experimental.proxy_tensor import (
+    get_proxy_slot,
+    PreDispatchTorchFunctionMode,
+    ProxyTorchDispatchMode,
+    track_tensor_tree,
+)
 from torch.utils import _pytree as pytree
+from torch.utils._python_dispatch import is_traceable_wrapper_subclass_type
 
 
 class ExportTracepoint(HigherOrderOperator):
@@ -115,3 +126,92 @@ def _mark_strict_experimental(cls):
 
     cls.__call__ = call
     return cls
+
+
+def _register_and_get_spec_proxy_in_tracer(tracer, name, spec):
+    fx_name = name + "0"
+    if hasattr(tracer.root, fx_name):
+        assert getattr(tracer.root, fx_name) == spec
+        return tracer.create_proxy("get_attr", fx_name, (), {})
+
+    qualname = tracer.get_fresh_qualname(name)
+    setattr(tracer.root, qualname, spec)
+    return tracer.create_proxy("get_attr", qualname, (), {})
+
+
+def _mark_subclass_constructor_exportable_experimental(constructor_subclass):
+    """
+    Experimental decorator that makes subclass to be traceable in export
+    with pre-dispatch IR. To make your subclass traceble in export, you need to:
+        1. Implement __init__ method for your subclass (Look at DTensor implementation)
+        2. Decorate your __init__ method with _mark_constructor_exportable_experimental
+
+    Example:
+
+    class FooTensor(torch.Tensor):
+        @staticmethod
+        def __new__(cls, elem, *, requires_grad=False):
+            # ...
+            return torch.Tensor._make_subclass(cls, elem, requires_grad=requires_grad)
+
+        @_mark_subclass_constructor_exportable_experimental
+        def __init__(self, elem, ...):
+            # ...
+    """
+
+    def wrapper(*args, **kwargs):
+        assert is_traceable_wrapper_subclass_type(
+            type(args[0])
+        ), "Can only apply _mark_constructor_exportable_experimental on tensor subclass constructors."
+        assert callable(constructor_subclass) and (
+            constructor_subclass.__name__ == "__init__"
+        ), "_mark_constructor_exportable_experimental can only be applied on tensor subclass constructors."  # noqa: B950
+        constructor_subclass(*args, **kwargs)
+        if not torch._C._is_torch_function_mode_enabled():
+            return
+        torch_function_mode_stack = torch.overrides._get_current_function_mode_stack()
+        for mode in torch_function_mode_stack:
+            if isinstance(mode, PreDispatchTorchFunctionMode):
+                tracer = mode.tracer
+                subclass = args[0]
+
+                flat_args, in_spec = to_graphable((tuple(args[1:]), kwargs))
+
+                constructor_spec_name = "_".join(
+                    constructor_subclass.__qualname__.lower().split(".")
+                )
+
+                # We actually don't want to create a new spec for each instance
+                # In fx graph, it will look like dtensor___init__0
+                spec_proxy = _register_and_get_spec_proxy_in_tracer(
+                    tracer, constructor_spec_name, in_spec
+                )
+                flat_proxy_args = pytree.tree_map_only(
+                    torch.Tensor, lambda x: get_proxy_slot(x, tracer).proxy, flat_args
+                )
+
+                _, func_spec = torch.utils._pytree.tree_flatten(
+                    ConstantFunction(type(subclass))
+                )
+
+                # We actually don't want to create a new spec for each instance
+                # In fx graph, it will look like dtensor_const_func_spec
+                # We can't directly shove DTensor.__init__ into fx as it is not
+                # allowed type.
+                fxable_constructor_call_spec_name = (
+                    type(subclass).__name__.lower() + "_const_func_spec"
+                )
+                func_spec_proxy = _register_and_get_spec_proxy_in_tracer(
+                    tracer, fxable_constructor_call_spec_name, func_spec
+                )
+
+                inner_proxy = tracer.create_proxy(
+                    "call_function",
+                    flat_apply,
+                    (func_spec_proxy, spec_proxy, *flat_proxy_args),
+                    {},
+                )
+                track_tensor_tree(subclass, inner_proxy, constant=None, tracer=tracer)
+                return
+
+    return wrapper
