@@ -826,7 +826,7 @@ class TestDeserialize(TestCase):
         for symbol in bound:
             self.assertTrue(symbol_is_type(symbol, SymT.UNBACKED_INT))
             self.assertTrue(
-                int(str(symbol)[len(prefix_str[SymT.UNBACKED_INT]):]) < next_index
+                int(str(symbol)[len(prefix_str[SymT.UNBACKED_INT]) :]) < next_index
             )
 
     def test_sym_bool_dynamic_shapes(self) -> None:

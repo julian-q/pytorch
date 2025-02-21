@@ -945,7 +945,7 @@ def _free_unbacked_symbols_with_path(
     path: pytree.KeyPath,
     real: Optional[object] = None,
     shape_env: Optional[ShapeEnv] = None,
-    pending: set[sympy.Symbol] = set(),
+    pending: Optional[set[sympy.Symbol]] = None,
     simplify: bool = False,
 ) -> dict[sympy.Symbol, pytree.KeyPath]:
     go = functools.partial(
@@ -963,6 +963,8 @@ def _free_unbacked_symbols_with_path(
         # simplification!
         return s.node._expr
 
+    if pending is None:
+        pending = set()
     r = {}
     if isinstance(a, (tuple, list)):
         # NB: real is apparently not always a tuple/list here
@@ -992,13 +994,14 @@ def _free_unbacked_symbols_with_path(
                 real=a.real_tensor.size() if a.real_tensor is not None else None,
             )
         )
-        r.update(
-            go(
-                a.stride(),
-                path + (CallMethodKey("stride"),),
-                real=a.real_tensor.stride() if a.real_tensor is not None else None,
+        if a.layout != torch.sparse_csr:
+            r.update(
+                go(
+                    a.stride(),
+                    path + (CallMethodKey("stride"),),
+                    real=a.real_tensor.stride() if a.real_tensor is not None else None,
+                )
             )
-        )
         r.update(
             go(
                 a.storage_offset(),

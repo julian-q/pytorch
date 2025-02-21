@@ -3871,7 +3871,7 @@ def forward(self, p_linear_weight, p_linear_bias, b_buffer, x):
         for symbol in bound:
             self.assertTrue(symbol_is_type(symbol, SymT.UNBACKED_INT))
             self.assertTrue(
-                int(str(symbol)[len(prefix_str[SymT.UNBACKED_INT]):]) < next_index
+                int(str(symbol)[len(prefix_str[SymT.UNBACKED_INT]) :]) < next_index
             )
 
     def test_torch_check_eq_commutativity(self):
@@ -3911,6 +3911,7 @@ def forward(self, p_linear_weight, p_linear_bias, b_buffer, x):
 
     def test_replaced_unbacked_bindings(self):
         import sympy
+
         from torch.utils._sympy.symbol import prefix_str, symbol_is_type, SymT
 
         class Foo(torch.nn.Module):
@@ -3937,7 +3938,10 @@ def forward(self, p_linear_weight, p_linear_bias, b_buffer, x):
             val = node.meta.get("val")
             bindings = node.meta.get("unbacked_bindings")
             self.assertTrue(
-                not (isinstance(val, sympy.Symbol) and symbol_is_type(val, SymT.UNBACKED_INT))
+                not (
+                    isinstance(val, sympy.Symbol)
+                    and symbol_is_type(val, SymT.UNBACKED_INT)
+                )
             )
             self.assertTrue(bindings is None)
 
