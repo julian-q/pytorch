@@ -3824,6 +3824,9 @@ def forward(self, p_linear_weight, p_linear_bias, b_buffer, x):
         export(N(), inputs, dynamic_shapes=dynamic_shapes)
 
     def test_unbacked_bindings_for_divisible_u_symint(self):
+        from torch.utils._sympy.symbol import prefix_str, symbol_is_type, SymT
+        from torch._guards import detect_fake_mode
+
         class M(torch.nn.Module):
             def forward(self, a, b):
                 return torch.ops.mylib.foo_unbacked(a, b)
@@ -3838,6 +3841,7 @@ def forward(self, p_linear_weight, p_linear_bias, b_buffer, x):
             u = ctx.new_dynamic_size(min=0, max=len(a) // 10) * 10
             return torch.empty(u, a.shape[1], dtype=a.dtype)
 
+        # check binding path is correct
         ep = export(
             M(),
             (torch.randn(100, 4), torch.tensor(10)),
@@ -3853,6 +3857,21 @@ def forward(self, p_linear_weight, p_linear_bias, b_buffer, x):
         self.assertEqual(len(path), 3)  # check path is [size, 0, DivideByKey(10)]
         self.assertEqual(type(path[2]).__name__, "DivideByKey")
         self.assertEqual(path[2].divisor, 10)
+
+        # collect bound symbols
+        bound = set()
+        for node in ep.graph.nodes:
+            bound.update(node.meta.get("unbacked_bindings", {}))
+
+        # check ShapeEnv counters compared to binding indices
+        shape_env = detect_fake_mode([
+            node.meta.get("val")
+            for node in ep.graph.nodes
+        ]).shape_env
+        next_index = next(shape_env.unbacked_symint_counter)
+        for symbol in bound:
+            self.assertTrue(symbol_is_type(symbol, SymT.UNBACKED_INT))
+            self.assertTrue(int(str(symbol)[len(prefix_str[SymT.UNBACKED_INT]):]) < next_index)
 
     def test_torch_check_eq_commutativity(self):
         class M1(torch.nn.Module):

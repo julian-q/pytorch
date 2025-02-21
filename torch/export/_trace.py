@@ -434,6 +434,37 @@ def _remap_constants(
                 constants[target] = constant
 
 
+def _replace_unbacked_bindings(
+    gm: torch.fx.GraphModule
+) -> None:
+    from torch.fx.experimental.symbolic_shapes import (
+        free_unbacked_symbols_with_path,
+    )
+    from torch.utils._sympy.symbol import symbol_is_type, SymT
+
+    fake_mode = detect_fake_mode([node.meta.get("val") for node in gm.graph.nodes])
+    if fake_mode is None or (shape_env := fake_mode.shape_env) is None:
+        return
+
+    base_unbacked_symbols = set(
+        symbol
+        for symbol in shape_env.var_to_range
+        if symbol_is_type(symbol, (SymT.UNBACKED_INT, SymT.UNBACKED_FLOAT))
+        and symbol not in shape_env.unbacked_renamings
+    )
+    for node in gm.graph.nodes:
+        node.meta.pop("unbacked_bindings", None)
+        if (
+            (val := node.meta.get("val")) is not None
+            and (
+                unbacked_bindings := free_unbacked_symbols_with_path(
+                    val, (), shape_env=shape_env, pending=base_unbacked_symbols, simplify=True
+                )
+            )
+        ):
+            node.meta["unbacked_bindings"] = unbacked_bindings
+
+
 def _produce_aten_artifact(
     *,
     gm: torch.fx.GraphModule,
@@ -791,6 +822,12 @@ def _export_to_aten_ir(
     # is not working well with aot_export. So we manually copy it.
     # (The node-level meta is addressed above.)
     _maybe_fixup_gm_and_output_node_meta(mod, gm)
+
+    if (
+        (fake_mode := detect_fake_mode(fake_args + tuple(fake_kwargs) + tuple(fake_params_buffers)))
+        and (shape_env := fake_mode.shape_env)
+    ):
+        _replace_unbacked_bindings(gm)
 
     # Run produce guards before we handle runtime asserts.
     # This means we run the export solver before the runtime asserts pass.
@@ -1398,22 +1435,6 @@ def _strict_export_lower_to_aten_ir(
     export_graph_signature = aten_export_artifact.sig
     constants = aten_export_artifact.constants
 
-    # update unbacked bindings that might have gone out of sync
-    # between Dynamo and AOTAutograd
-    for node in gm.graph.nodes:
-        if "unbacked_bindings" in node.meta:
-            old_unbacked_bindings = node.meta["unbacked_bindings"]
-            val = node.meta["val"]
-            new_unbacked_bindings = {}
-            for key in old_unbacked_bindings.values():
-                expr = pytree.key_get(val, key).node.expr
-                if expr.is_symbol:
-                    new_unbacked_bindings[expr] = key
-            if new_unbacked_bindings:
-                node.meta["unbacked_bindings"] = new_unbacked_bindings
-            else:
-                del node.meta["unbacked_bindings"]
-
     _populate_param_buffer_metadata_to_new_gm(
         params_buffers_to_node_meta, gm, export_graph_signature
     )
@@ -1670,6 +1691,8 @@ def _export_to_aten_ir_make_fx(
             trace_joint=False,
             kwargs=fake_kwargs,
         )
+
+        _replace_unbacked_bindings(gm)
 
         # [NOTE] In training IR, we don't run
         # any DCE as a result we preserve constant
