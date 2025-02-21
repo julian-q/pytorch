@@ -6,6 +6,7 @@ functions to be run in multiprocessing. E.g., the data loading worker loop is
 in `./_utils/worker.py`.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 import functools
 import itertools
 import logging
@@ -1143,9 +1144,16 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             #     it started, so that we do not call .join() if program dies
             #     before it starts, and __del__ tries to join but will get:
             #     AssertionError: can only join a started process.
-            w.start()
+            
+            # HACK: actually don't start the process here because its
+            # blocking and slow
+
             self._index_queues.append(index_queue)
             self._workers.append(w)
+
+        # Start workers in parallel.
+        with ThreadPoolExecutor() as pool:
+            pool.map(lambda w: w.start(), self._workers)
 
         if self._pin_memory:
             self._pin_memory_thread_done_event = threading.Event()
