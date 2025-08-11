@@ -63,10 +63,11 @@ DLDataType getDLDataType(const Tensor& t) {
     case ScalarType::BFloat16:
       dtype.code = DLDataTypeCode::kDLBfloat;
       break;
-    // TODO(#146647): use macro here instead of spelling out each shell dtype
+    case ScalarType::Float8_e4m3fn:
+      dtype.code = DLDataTypeCode::kDLFloat8_e4m3fn;
+      break;
     case ScalarType::Float8_e5m2:
     case ScalarType::Float8_e5m2fnuz:
-    case ScalarType::Float8_e4m3fn:
     case ScalarType::Float8_e4m3fnuz:
     case ScalarType::Float8_e8m0fnu:
       TORCH_CHECK_BUFFER(false, "float8 types are not supported by dlpack");
@@ -237,6 +238,16 @@ ScalarType toScalarType(const DLDataType& dtype) {
       switch (dtype.bits) {
         case 16:
           stype = ScalarType::BFloat16;
+          break;
+        default:
+          TORCH_CHECK_BUFFER(
+              false, "Unsupported kFloat bits ", std::to_string(dtype.bits));
+      }
+      break;
+    case DLDataTypeCode::kDLFloat8_e4m3fn:
+      switch (dtype.bits) {
+        case 8:
+          stype = ScalarType::Float8_e4m3fn;
           break;
         default:
           TORCH_CHECK_BUFFER(
